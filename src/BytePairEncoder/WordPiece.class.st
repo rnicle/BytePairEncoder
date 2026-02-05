@@ -35,6 +35,47 @@ WordPiece >> computePairs [
 		 ] 
 ]
 
+{ #category : 'api' }
+WordPiece >> encode: aString [
+
+	| rawWords tokens |
+	rawWords := aString substrings: {
+			            Character space.
+			            Character cr.
+			            Character tab . $. . $? .$! .$: . $;}.
+	tokens := OrderedCollection new .
+	
+	rawWords do: [ :each | 
+		tokens add: ( self encodeWord: each )
+		 ].
+	
+	tokens := tokens flatCollect: [ :each | each ] .
+	
+	^ tokens
+			
+]
+
+{ #category : 'private - encoding' }
+WordPiece >> encodeWord: aWord [ 
+
+	| tokens word |
+	word := aWord .
+	tokens := OrderedCollection new .
+	
+	[ word isNotEmpty ] whileTrue: [ | i |
+		i := 0 .
+		[ i < word size and: [ ( vocabulary includes: ( word allButLast: i ) ) not ] ] whileTrue: [ 
+			i := i + 1 ] .
+			( i >= word size ) ifTrue: [ ^ OrderedCollection with: '<UNK>' ] .
+			tokens add: ( word allButLast: i ) .
+			word := word allButFirst: word size - i .
+			( word isNotEmpty ) ifTrue: [ 
+				word := '##', word ].
+			 ].
+		
+	^ tokens 
+]
+
 { #category : 'merges' }
 WordPiece >> findPairToMerge [ 
 "Cherche la paire ayant la fréquence maximale dans pairsScores et le renvoie."
@@ -51,7 +92,7 @@ WordPiece >> letterFrequency [
 { #category : 'as yet unclassified' }
 WordPiece >> merge: s1 and: s2 [
 
-	( s2 size > 1 ) ifTrue: [ ^ s1, s2 allButFirst ] 
+	( s2 size > 1 ) ifTrue: [ ^ s1, ( s2 allButFirst: 2 ) ] 
 ]
 
 { #category : 'initialization' }
@@ -74,6 +115,22 @@ WordPiece >> textToWords: aText [
 				 col := OrderedCollection new.
 				col add: each first asString.
 				2 to: each size do: [ :i| 
-					col add: '#',( each at: i ) asString ] .
+					col add: '##',( each at: i ) asString ] .
 				 col ] )
+]
+
+{ #category : 'as yet unclassified' }
+WordPiece >> train: anInteger [
+
+	|n|
+	
+	n := anInteger - vocabulary size .
+	
+	[ n > 0 ] whileTrue: [ 
+		self mergeOneStep .
+		n := n - 1 ] .
+	
+	^ vocabulary 
+
+	
 ]
